@@ -20,6 +20,4 @@ class Settings:
             missing.append("LLAMA_MODEL")
 
         if missing:
-            raise RuntimeError(
-                f"Missing environment variables: {', '.join(missing)}"
-            )
+            raise RuntimeError(f"Missing environment variables: {', '.join(missing)}")

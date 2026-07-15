@@ -1,0 +1,5 @@
+faiss-cpu
+numpy
+sentence_transformers
+python-dotenv
+openai

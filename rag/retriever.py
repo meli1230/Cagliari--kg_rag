@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import json
 import re
-from dataclasses import asdict
-from pathlib import Path
-
 import faiss
 import numpy as np
+
+from dataclasses import asdict
+from pathlib import Path
 from sentence_transformers import SentenceTransformer
 
 from rag.models import Article, RetrievedArticle

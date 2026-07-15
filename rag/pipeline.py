@@ -45,24 +45,13 @@ class ArticleRAGPipeline:
         )
 
     @staticmethod
-    def _format_context(
-        results: list[RetrievedArticle],
-    ) -> str:
-        """
-        Convert retrieved articles into text for the LLM.
-        """
+    def _format_context(results: list[RetrievedArticle],) -> str:
         context_parts = []
 
-        for position, result in enumerate(
-            results,
-            start=1,
-        ):
+        for position, result in enumerate(results, start=1,):
             article = result.article
 
-            metadata = json.dumps(
-                article.metadata,
-                ensure_ascii=False,
-            )
+            metadata = json.dumps(article.metadata, ensure_ascii=False,)
 
             context_parts.append(
                 "\n".join(
@@ -89,12 +78,6 @@ class ArticleRAGPipeline:
         top_k: int = 3,
         minimum_similarity: float = 0.35,
     ) -> str:
-        """
-        Retrieve an article and return its stored abstract.
-
-        The LLM is used to select and format the result, but it
-        must not invent a new abstract.
-        """
         results = self.retriever.retrieve(
             requested_title=requested_title,
             top_k=top_k,
@@ -102,8 +85,7 @@ class ArticleRAGPipeline:
 
         if not results:
             return (
-                "No matching article was found "
-                "in the database."
+                "No matching article was found in the database."
             )
 
         best_result = results[0]
