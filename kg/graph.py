@@ -1,10 +1,9 @@
-# add papers, save/load json
+# add papers, save/load jsonl
 
 import json
 import os
 import time
 
-from .config import PRETTY_PRINT_LIMIT
 from .utils import author_key, clean_text
 
 
@@ -100,59 +99,60 @@ def build_export(graph):
 
 
 def save_graph(graph, path):
-    # write to a tmp file then rename so its not crashagle
+    # jsonl: one object per line -> stats line, then a line per node, then per relationship.
+    # write to a tmp file then rename so a crash can't leave a half file
     nodes, relationships = build_export(graph)
-    out = {
-        "stats": {
-            "papers": len(graph["papers"]),
-            "authors": len(graph["authors"]),
-            "categories": len(graph["categories"]),
-            "nodes": len(nodes),
-            "relationships": len(relationships),
-            "generated": time.strftime("%Y-%m-%d %H:%M:%S"),
-        },
-        "nodes": nodes,
-        "relationships": relationships,
+    stats = {
+        "papers": len(graph["papers"]),
+        "authors": len(graph["authors"]),
+        "categories": len(graph["categories"]),
+        "nodes": len(nodes),
+        "relationships": len(relationships),
+        "generated": time.strftime("%Y-%m-%d %H:%M:%S"),
     }
-    pretty = (len(nodes) + len(relationships)) <= PRETTY_PRINT_LIMIT
     tmp = path + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
-        if pretty:
-            json.dump(out, f, ensure_ascii=False, indent=2)
-        else:
-            json.dump(out, f, ensure_ascii=False, separators=(",", ":"))
+        f.write(json.dumps({"stats": stats}, ensure_ascii=False) + "\n")
+        for row in nodes:
+            f.write(json.dumps(row, ensure_ascii=False) + "\n")
+        for row in relationships:
+            f.write(json.dumps(row, ensure_ascii=False) + "\n")
     os.replace(tmp, path)
-    return out["stats"]
+    return stats
 
 
 def load_graph(path):
-    # read a saved file back into the dicts
+    # read the jsonl back into the dicts, one line at a time
     graph = new_graph()
     if not os.path.exists(path):
         return graph
     with open(path, "r", encoding="utf-8") as f:
-        data = json.load(f)
-
-    for node in data.get("nodes", []):
-        kind, _, key = node["id"].partition(":")
-        props = node.get("properties", {})
-        if kind == "paper":
-            graph["papers"][key] = {
-                "title": props.get("title", ""),
-                "abstract": props.get("abstract", ""),
-                "authors": props.get("authors", ""),
-                "author_keys": props.get("author_keys", []),
-                "categories": props.get("categories", []),
-                "doi": props.get("doi", ""),
-                "journal_ref": props.get("journal_ref", ""),
-                "update_date": props.get("update_date", ""),
-            }
-        elif kind == "author":
-            graph["authors"][key] = {
-                "name": props.get("name", key),
-                "paper_count": props.get("paper_count", 1),
-            }
-        elif kind == "category":
-            graph["categories"][key] = props.get("paper_count", 0)
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            obj = json.loads(line)
+            if "labels" not in obj:
+                continue  # stats line or a relationship (rebuilt from nodes on save)
+            kind, _, key = obj["id"].partition(":")
+            props = obj.get("properties", {})
+            if kind == "paper":
+                graph["papers"][key] = {
+                    "title": props.get("title", ""),
+                    "abstract": props.get("abstract", ""),
+                    "authors": props.get("authors", ""),
+                    "author_keys": props.get("author_keys", []),
+                    "categories": props.get("categories", []),
+                    "doi": props.get("doi", ""),
+                    "journal_ref": props.get("journal_ref", ""),
+                    "update_date": props.get("update_date", ""),
+                }
+            elif kind == "author":
+                graph["authors"][key] = {
+                    "name": props.get("name", key),
+                    "paper_count": props.get("paper_count", 1),
+                }
+            elif kind == "category":
+                graph["categories"][key] = props.get("paper_count", 0)
 
     return graph
