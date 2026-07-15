@@ -2,23 +2,42 @@ from __future__ import annotations
 
 import json
 import os
+import logging
 
 from dotenv import load_dotenv
 from openai import OpenAI
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
 
 from rag.models import RetrievedArticle
 from rag.retriever import ArticleRetriever
+from rag.kgqueries import KGQueryEngine
 
 
 load_dotenv()
+logger = logging.getLogger(__name__)
 
+@dataclass
+class HybridAnswer:
+    answer: str
+    route: str
+    query_name: str | None = None
+    resolved_title: str | None = None
 
 class ArticleRAGPipeline:
-    def __init__(self, retriever: ArticleRetriever, model_name: str | None = None, api_key: str | None = None) -> None:
+    def __init__(
+        self,
+        retriever: ArticleRetriever,
+        kg_engine: KGQueryEngine | None = None,
+        model_name: str | None = None,
+        base_url: str | None = None,
+        api_key: str | None = None,
+    ) -> None:
         self.retriever = retriever
+        self.kg_engine = kg_engine
 
         self.model_name = (model_name or os.getenv("OPENAI_MODEL", "gpt-4o-mini"))
-
         self.api_key = (api_key or os.getenv("LLM_API_KEY"))
 
         if not self.api_key:
