@@ -1,4 +1,4 @@
-# arXiv Knowledge Graph
+# arXiv RAG + Knowledge Graph
 
 Builds a knowledge graph out of the arXiv metadata snapshot (deterministically) and
 emits it as RDF (Turtle/TriG) for GraphDB or any triplestore.
