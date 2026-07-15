@@ -5,11 +5,11 @@ import argparse
 import os
 import time
 
-from kg.arxiv import iter_papers, sample_papers
-from kg.config import DEFAULT_INPUT, DEFAULT_OUTPUT, DEFAULT_RDF_BASE
-from kg.graph import graph_stats, ingest_paper, new_graph
-from kg.papers import save_papers
-from kg.rdf import save_rdf
+from kg_extraction.arxiv import iter_papers, sample_papers
+from kg_extraction.config import DEFAULT_INPUT, DEFAULT_OUTPUT, DEFAULT_RDF_BASE
+from kg_extraction.graph import graph_stats, ingest_paper, new_graph
+from kg_extraction.papers import save_papers
+from kg_extraction.rdf import save_rdf
 
 
 def main():

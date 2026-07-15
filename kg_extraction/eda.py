@@ -2,7 +2,9 @@ import json
 from collections import Counter
 import time
 
-FILE = "arxiv-metadata-oai-snapshot.json"
+from kg_extraction.config import DEFAULT_INPUT
+
+FILE = DEFAULT_INPUT
 
 categories = Counter()
 years = Counter()

@@ -15,8 +15,9 @@ Python 3, standard library only (nothing to `pip install`).
 ## Data source
 
 The [arXiv metadata snapshot](https://www.kaggle.com/datasets/Cornell-University/arxiv)
-- one JSON object per line, ~3.1M papers, ~5 GB. The path is set in
-[`kg/config.py`](kg/config.py) (`DEFAULT_INPUT`).
+- one JSON object per line, ~3.1M papers, ~5 GB. Not committed (too large); drop it at
+`data/raw/arxiv-metadata-oai-snapshot.json`, or override the path in
+[`kg_extraction/config.py`](kg_extraction/config.py) (`DEFAULT_INPUT`).
 
 ## Graph schema
 
@@ -36,23 +37,23 @@ Relationships
 | `IN_CATEGORY` | Paper → Category | - |
 
 Authors are deduplicated by a coarse key: accent-stripped last name + first-name
-initials (`author_key` in [`kg/utils.py`](kg/utils.py)), so "E. L. Berger" and
+initials (`author_key` in [`kg_extraction/utils.py`](kg_extraction/utils.py)), so "E. L. Berger" and
 "Edward L. Berger" merge into one node. This occasionally merges two different
 people who share a last name and initials - an accepted trade-off.
 
 ## Usage
 
-Run from this folder (the one containing `knowledge_graph.py` and the `kg/` package):
+Run as a module from the repo root (the one containing `kg_extraction/`):
 
 ```bash
 # The RAG benchmark: 100 random AI/ML papers, reproducible via the seed
-python knowledge_graph.py --sample 100 --categories cs.AI cs.LG --seed 42
+python -m kg_extraction.build_kg --sample 100 --categories cs.AI cs.LG --seed 42
 
 # Ingest everything matching, no sampling (large)
-python knowledge_graph.py --limit 0 --categories cs.AI cs.CL cs.LG
+python -m kg_extraction.build_kg --limit 0 --categories cs.AI cs.CL cs.LG
 
 # Keyword filter, first 200 matches
-python knowledge_graph.py --limit 200 --search "knowledge graph"
+python -m kg_extraction.build_kg --limit 200 --search "knowledge graph"
 ```
 
 Flags:
@@ -65,10 +66,10 @@ Flags:
 | `--search` | Keyword that must appear in the title or abstract (case-insensitive). |
 | `--limit N` | Stop after N matching papers. `0` = no limit. Note: the snapshot is in ascending arXiv-ID order, so a bounded run returns the oldest N, not the newest. Ignored when `--sample` is set. |
 | `--format` | RDF serialization: `ttl` (Turtle, default) or `trig` (TriG, wraps the data in one named graph). |
-| `--base` | Namespace base for author/category/vocabulary IRIs (default `http://example.org/arxiv/`, from `kg/config.py`). arXiv papers always use their real `https://arxiv.org/abs/` URIs. |
+| `--base` | Namespace base for author/category/vocabulary IRIs (default `http://example.org/arxiv/`, from `kg_extraction/config.py`). arXiv papers always use their real `https://arxiv.org/abs/` URIs. |
 | `--papers [PATH]` | Also write the article records (the RAG corpus) as a flat table. `PATH` optional (defaults to the output path with a `.csv`/`.json` extension). See [Articles table](#articles-table-the-corpus). |
 | `--papers-format` | `csv` (default) or `json`. |
-| `--input` / `--output` | Override the default snapshot / RDF-output paths from `kg/config.py`. |
+| `--input` / `--output` | Override the default snapshot / RDF-output paths from `kg_extraction/config.py`. |
 
 Papers with no abstract are always skipped. `Ctrl-C` during a run writes what's been
 ingested so far.
@@ -150,8 +151,8 @@ The committed output is a reproducible 100-paper random sample of AI/ML
 Rebuild both artifacts identically with:
 
 ```bash
-python knowledge_graph.py --sample 100 --categories cs.AI cs.LG --seed 42 \
-    --output knowledge_graph.ttl --papers knowledge_graph.csv
+python -m kg_extraction.build_kg --sample 100 --categories cs.AI cs.LG --seed 42 \
+    --output data/processed/knowledge_graph.ttl --papers data/processed/knowledge_graph.csv
 ```
 
 ## Design decisions
@@ -248,12 +249,20 @@ researchers collapsed into one node. Consequences:
 ## Layout
 
 ```
-knowledge_graph.py   CLI entry point
-kg/
-  config.py          paths + pretty-print threshold
-  utils.py           text cleanup + author-key normalization
-  arxiv.py           streaming JSONL reader + reproducible sampling
-  graph.py           in-memory graph model
-  rdf.py             RDF export (Turtle/TriG) for GraphDB
-  papers.py          article-table export (CSV/JSON), the RAG corpus
+kg_extraction/        data extraction + KG-building pipeline
+  build_kg.py         CLI entry point (run as `python -m kg_extraction.build_kg`)
+  eda.py              exploratory analysis of the raw arXiv snapshot
+  config.py           paths (relative to data/) + pretty-print threshold
+  utils.py            text cleanup + author-key normalization
+  arxiv.py            streaming JSONL reader + reproducible sampling
+  graph.py            in-memory graph model
+  rdf.py              RDF export (Turtle/TriG) for GraphDB
+  papers.py           article-table export (CSV/JSON), the RAG corpus
+data/
+  raw/                arXiv snapshot (not committed, see Data source)
+  processed/          committed knowledge_graph.ttl / knowledge_graph.csv
+webapp/               Flask demo app (currently a stub - RAG pipeline not wired in yet)
+  app.py
+  templates/
+  static/
 ```
