@@ -2,11 +2,13 @@
 # as RDF (Turtle/TriG) for GraphDB. usage, flags and layout are in README.md
 
 import argparse
+import os
 import time
 
 from kg.arxiv import iter_papers, sample_papers
 from kg.config import DEFAULT_INPUT, DEFAULT_OUTPUT, DEFAULT_RDF_BASE
 from kg.graph import graph_stats, ingest_paper, new_graph
+from kg.papers import save_papers
 from kg.rdf import save_rdf
 
 
@@ -18,6 +20,11 @@ def main():
                         help="RDF serialization: Turtle (default) or TriG")
     parser.add_argument("--base", default=DEFAULT_RDF_BASE,
                         help="namespace base for author/category/vocab IRIs")
+    parser.add_argument("--papers", nargs="?", const="", default=None,
+                        help="also write the article records (the RAG corpus); optional PATH "
+                             "(default: output with a .csv/.json extension)")
+    parser.add_argument("--papers-format", choices=["csv", "json"], default="csv",
+                        help="article-table format (default: csv)")
     parser.add_argument("--limit", type=int, default=25, help="max papers this run; 0 = no limit")
     parser.add_argument("--sample", type=int, default=None,
                         help="randomly sample N papers from the matches (reproducible with --seed)")
@@ -47,7 +54,7 @@ def main():
     except KeyboardInterrupt:
         print("\nInterrupted — saving what we have...")
 
-    n = save_rdf(graph, args.output, fmt=args.format, base=args.base)
+    save_rdf(graph, args.output, fmt=args.format, base=args.base)
     stats = graph_stats(graph)
     elapsed = time.time() - start
     print(f"\nDone in {elapsed:.0f}s: {processed} papers this run.")
@@ -55,6 +62,11 @@ def main():
           f"{stats['relationships']:,} relationships -> {args.output}")
     print(f"  papers={stats['papers']:,} authors={stats['authors']:,} "
           f"categories={stats['categories']:,}")
+
+    if args.papers is not None:
+        papers_path = args.papers or os.path.splitext(args.output)[0] + "." + args.papers_format
+        n = save_papers(graph, papers_path, fmt=args.papers_format)
+        print(f"Articles ({args.papers_format}): {n:,} rows -> {papers_path}")
 
 
 if __name__ == "__main__":

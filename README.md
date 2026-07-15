@@ -66,6 +66,8 @@ Flags:
 | `--limit N` | Stop after N matching papers. `0` = no limit. Note: the snapshot is in ascending arXiv-ID order, so a bounded run returns the oldest N, not the newest. Ignored when `--sample` is set. |
 | `--format` | RDF serialization: `ttl` (Turtle, default) or `trig` (TriG, wraps the data in one named graph). |
 | `--base` | Namespace base for author/category/vocabulary IRIs (default `http://example.org/arxiv/`, from `kg/config.py`). arXiv papers always use their real `https://arxiv.org/abs/` URIs. |
+| `--papers [PATH]` | Also write the article records (the RAG corpus) as a flat table. `PATH` optional (defaults to the output path with a `.csv`/`.json` extension). See [Articles table](#articles-table-the-corpus). |
+| `--papers-format` | `csv` (default) or `json`. |
 | `--input` / `--output` | Override the default snapshot / RDF-output paths from `kg/config.py`. |
 
 Papers with no abstract are always skipped. `Ctrl-C` during a run writes what's been
@@ -115,6 +117,23 @@ SELECT ?title ?author WHERE {
 }
 ```
 
+## Articles table (the corpus)
+
+Pass `--papers` to also emit the paper records as a flat one-row-per-article table —
+the RAG corpus that pairs with the graph. CSV by default (opens in Excel / loads as a
+DataFrame), or `--papers-format json` for a JSON array.
+
+| Column | |
+|---|---|
+| `arxiv_id`, `url` | `url` is `https://arxiv.org/abs/<arxiv_id>` — **the join key**: it's exactly the `Paper` IRI in the RDF, so the table and the graph line up 1:1. |
+| `title`, `abstract` | The retrieval text (title + abstract). |
+| `authors` | Human-readable author string. |
+| `author_keys`, `categories` | Multi-valued: JSON arrays, or `|`-joined in CSV. `author_keys`/`categories` are the graph's `Author`/`Category` keys, so you can walk from a retrieved row into the KG. |
+| `update_date`, `doi`, `journal_ref` | Metadata (may be empty). |
+
+So the two artifacts complement each other: the CSV/JSON is the text to retrieve over,
+the RDF is the structure to reason over, joined on `arxiv_id`.
+
 ### Current build
 
 The committed output is a reproducible 100-paper random sample of AI/ML
@@ -128,10 +147,11 @@ The committed output is a reproducible 100-paper random sample of AI/ML
 | Nodes | 578 |
 | Relationships | 725 |
 
-Rebuild it identically with:
+Rebuild both artifacts identically with:
 
 ```bash
-python knowledge_graph.py --sample 100 --categories cs.AI cs.LG --seed 42
+python knowledge_graph.py --sample 100 --categories cs.AI cs.LG --seed 42 \
+    --output knowledge_graph.ttl --papers knowledge_graph.csv
 ```
 
 ## Design decisions
@@ -233,6 +253,7 @@ kg/
   config.py          paths + pretty-print threshold
   utils.py           text cleanup + author-key normalization
   arxiv.py           streaming JSONL reader + reproducible sampling
-  graph.py           graph model + JSONL save/load
+  graph.py           in-memory graph model
   rdf.py             RDF export (Turtle/TriG) for GraphDB
+  papers.py          article-table export (CSV/JSON), the RAG corpus
 ```
