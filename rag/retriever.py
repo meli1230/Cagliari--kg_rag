@@ -13,48 +13,22 @@ from rag.models import Article, RetrievedArticle
 
 
 class ArticleRetriever:
-    def __init__(
-        self,
-        embedding_model_name: str = (
-            "sentence-transformers/all-MiniLM-L6-v2"
-        ),
-    ) -> None:
+    def __init__(self, embedding_model_name: str = "sentence-transformers/all-MiniLM-L6-v2", ) -> None:
         self.embedding_model_name = embedding_model_name
-
-        self.embedding_model = SentenceTransformer(
-            embedding_model_name
-        )
-
+        self.embedding_model = SentenceTransformer(embedding_model_name)
         self.articles: list[Article] = []
         self.index: faiss.IndexFlatIP | None = None
 
     @staticmethod
     def normalize_title(title: str) -> str:
-        """
-        Normalize a title for exact and near-exact comparison.
-
-        Example:
-            "Retrieval-Augmented Generation!"
-            becomes
-            "retrieval augmented generation"
-        """
         title = title.casefold()
         title = re.sub(r"[^\w\s]", " ", title)
         title = re.sub(r"\s+", " ", title)
 
         return title.strip()
 
-    def _encode_articles(
-        self,
-        texts: list[str],
-    ) -> np.ndarray:
-        """
-        Create normalized embeddings for the article corpus.
-        """
-        if hasattr(
-            self.embedding_model,
-            "encode_document",
-        ):
+    def _encode_articles(self, texts: list[str], ) -> np.ndarray:
+        if hasattr(self.embedding_model, "encode_document", ):
             embeddings = self.embedding_model.encode_document(
                 texts,
                 convert_to_numpy=True,
@@ -69,22 +43,10 @@ class ArticleRetriever:
                 show_progress_bar=True,
             )
 
-        return np.asarray(
-            embeddings,
-            dtype=np.float32,
-        )
+        return np.asarray(embeddings, dtype=np.float32, )
 
-    def _encode_query(
-        self,
-        query: str,
-    ) -> np.ndarray:
-        """
-        Create a normalized embedding for a search query.
-        """
-        if hasattr(
-            self.embedding_model,
-            "encode_query",
-        ):
+    def _encode_query(self, query: str, ) -> np.ndarray:
+        if hasattr(self.embedding_model, "encode_query", ):
             embedding = self.embedding_model.encode_query(
                 query,
                 convert_to_numpy=True,
@@ -97,35 +59,23 @@ class ArticleRetriever:
                 normalize_embeddings=True,
             )
 
-        embedding = np.asarray(
-            embedding,
-            dtype=np.float32,
-        )
+        embedding = np.asarray(embedding, dtype=np.float32, )
 
         if embedding.ndim == 1:
             embedding = embedding.reshape(1, -1)
 
         return embedding
 
-    def build_index(
-        self,
-        articles: list[Article],
-    ) -> None:
-        """
-        Build the FAISS vector index from cleaned articles.
-        """
+    def build_index(self, articles: list[Article], ) -> None:
         valid_articles = [
             article
             for article in articles
             if article.title.strip()
-            and article.abstract.strip()
+               and article.abstract.strip()
         ]
 
         if not valid_articles:
-            raise ValueError(
-                "No valid articles were provided. Each article "
-                "must contain a title and an abstract."
-            )
+            raise ValueError("No valid articles were provided. Each article must contain a title and an abstract.")
 
         self.articles = valid_articles
 
@@ -135,31 +85,17 @@ class ArticleRetriever:
         ]
 
         embeddings = self._encode_articles(texts)
-
         embedding_dimension = embeddings.shape[1]
 
-        # Because the embeddings are normalized, inner product
-        # corresponds to cosine similarity.
         self.index = faiss.IndexFlatIP(
             embedding_dimension
         )
 
         self.index.add(embeddings)
+        print(f"Indexed {len(self.articles)} articles.")
 
-        print(
-            f"Indexed {len(self.articles)} articles."
-        )
-
-    def _find_exact_matches(
-        self,
-        requested_title: str,
-    ) -> list[RetrievedArticle]:
-        """
-        Look for normalized exact-title matches before using FAISS.
-        """
-        normalized_requested_title = self.normalize_title(
-            requested_title
-        )
+    def _find_exact_matches(self, requested_title: str, ) -> list[RetrievedArticle]:
+        normalized_requested_title = self.normalize_title(requested_title)
 
         matches = []
 
@@ -168,10 +104,7 @@ class ArticleRetriever:
                 article.title
             )
 
-            if (
-                normalized_article_title
-                == normalized_requested_title
-            ):
+            if normalized_article_title == normalized_requested_title:
                 matches.append(
                     RetrievedArticle(
                         article=article,
@@ -182,41 +115,21 @@ class ArticleRetriever:
 
         return matches
 
-    def retrieve(
-        self,
-        requested_title: str,
-        top_k: int = 3,
-    ) -> list[RetrievedArticle]:
-        """
-        Retrieve an article by title.
-
-        Retrieval strategy:
-        1. Try a normalized exact-title lookup.
-        2. If no exact match exists, use semantic retrieval.
-        3. Apply a bonus to partial title matches.
-        """
+    def retrieve(self, requested_title: str, top_k: int = 3, ) -> list[RetrievedArticle]:
         if self.index is None:
-            raise RuntimeError(
-                "The index has not been built or loaded."
-            )
+            raise RuntimeError("The index has not been built or loaded.")
 
         requested_title = requested_title.strip()
 
         if not requested_title:
-            raise ValueError(
-                "The requested title cannot be empty."
-            )
+            raise ValueError("The requested title cannot be empty.")
 
-        exact_matches = self._find_exact_matches(
-            requested_title
-        )
+        exact_matches = self._find_exact_matches(requested_title)
 
         if exact_matches:
             return exact_matches[:top_k]
 
-        normalized_requested_title = self.normalize_title(
-            requested_title
-        )
+        normalized_requested_title = self.normalize_title()
 
         query = (
             "Find the academic article with this title: "
@@ -224,42 +137,25 @@ class ArticleRetriever:
         )
 
         query_embedding = self._encode_query(query)
-
-        candidate_count = min(
-            max(top_k * 5, 10),
-            len(self.articles),
-        )
-
-        scores, indices = self.index.search(
-            query_embedding,
-            candidate_count,
-        )
-
+        candidate_count = min(max(top_k * 5, 10), len(self.articles))
+        scores, indices = self.index.search(query_embedding, candidate_count)
         results: list[RetrievedArticle] = []
 
-        for score, article_index in zip(
-            scores[0],
-            indices[0],
-        ):
+        for score, article_index in zip(scores[0], indices[0]):
             if article_index < 0:
                 continue
 
-            article = self.articles[
-                int(article_index)
-            ]
-
-            normalized_candidate_title = self.normalize_title(
-                article.title
-            )
+            article = self.articles[int(article_index)]
+            normalized_candidate_title = self.normalize_title(article.title)
 
             final_score = float(score)
             match_type = "semantic"
 
             if (
-                normalized_requested_title
-                in normalized_candidate_title
-                or normalized_candidate_title
-                in normalized_requested_title
+                    normalized_requested_title
+                    in normalized_candidate_title
+                    or normalized_candidate_title
+                    in normalized_requested_title
             ):
                 final_score += 0.20
                 match_type = "partial_title"
@@ -279,101 +175,39 @@ class ArticleRetriever:
 
         return results[:top_k]
 
-    def save(
-        self,
-        output_directory: str | Path,
-    ) -> None:
-        """
-        Save the FAISS index and article records.
-        """
+    def save(self, output_directory: str | Path) -> None:
         if self.index is None:
-            raise RuntimeError(
-                "Build the index before saving it."
-            )
+            raise RuntimeError("Build the index before saving it.")
 
         output_directory = Path(output_directory)
+        output_directory.mkdir(parents=True, exist_ok=True)
+        faiss.write_index(self.index, str(output_directory / "articles.faiss"))
 
-        output_directory.mkdir(
-            parents=True,
-            exist_ok=True,
-        )
+        article_data = [asdict(article) for article in self.articles]
 
-        faiss.write_index(
-            self.index,
-            str(output_directory / "articles.faiss"),
-        )
+        with (output_directory / "articles.json").open("w", encoding="utf-8") as file:
+            json.dump(article_data, file, ensure_ascii=False, indent=2)
 
-        article_data = [
-            asdict(article)
-            for article in self.articles
-        ]
+        configuration = {"embedding_model_name": self.embedding_model_name}
 
-        with (
-            output_directory / "articles.json"
-        ).open(
-            "w",
-            encoding="utf-8",
-        ) as file:
-            json.dump(
-                article_data,
-                file,
-                ensure_ascii=False,
-                indent=2,
-            )
+        with (output_directory / "retriever_config.json").open("w", encoding="utf-8",) as file:
+            json.dump(configuration, file, indent=2)
 
-        configuration = {
-            "embedding_model_name": (
-                self.embedding_model_name
-            )
-        }
-
-        with (
-            output_directory / "retriever_config.json"
-        ).open(
-            "w",
-            encoding="utf-8",
-        ) as file:
-            json.dump(
-                configuration,
-                file,
-                indent=2,
-            )
-
-    def load(
-        self,
-        input_directory: str | Path,
-    ) -> None:
-        """
-        Load a previously saved index and article collection.
-        """
+    def load(self, input_directory: str | Path) -> None:
         input_directory = Path(input_directory)
+        index_path = (input_directory / "articles.faiss")
 
-        index_path = (
-            input_directory / "articles.faiss"
-        )
-
-        articles_path = (
-            input_directory / "articles.json"
-        )
+        articles_path = (input_directory / "articles.json")
 
         if not index_path.exists():
-            raise FileNotFoundError(
-                f"FAISS index not found: {index_path}"
-            )
+            raise FileNotFoundError(f"FAISS index not found: {index_path}")
 
         if not articles_path.exists():
-            raise FileNotFoundError(
-                f"Article file not found: {articles_path}"
-            )
+            raise FileNotFoundError(f"Article file not found: {articles_path}")
 
-        self.index = faiss.read_index(
-            str(index_path)
-        )
+        self.index = faiss.read_index(str(index_path))
 
-        with articles_path.open(
-            "r",
-            encoding="utf-8",
-        ) as file:
+        with articles_path.open("r", encoding="utf-8") as file:
             raw_articles = json.load(file)
 
         self.articles = [

@@ -69,24 +69,12 @@ def create_test_articles() -> list[Article]:
 
 def main() -> None:
     articles = create_test_articles()
-
     retriever = ArticleRetriever()
-
     retriever.build_index(articles)
+    rag = ArticleRAGPipeline(retriever=retriever)
 
-    rag = ArticleRAGPipeline(
-        retriever=retriever
-    )
-
-    requested_title = (
-        "Retrieval-Augmented Generation for "
-        "Knowledge-Intensive NLP Tasks"
-    )
-
-    answer = rag.generate_abstract(
-        requested_title=requested_title
-    )
-
+    requested_title = "Retrieval-Augmented Generation for Knoledge-Intensive NLP Tasks"
+    answer = rag.generate_abstract(requested_title=requested_title)
     print(answer)
 
 

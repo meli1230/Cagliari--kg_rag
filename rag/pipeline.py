@@ -14,35 +14,17 @@ load_dotenv()
 
 
 class ArticleRAGPipeline:
-    def __init__(
-        self,
-        retriever: ArticleRetriever,
-        model_name: str | None = None,
-        api_key: str | None = None,
-    ) -> None:
+    def __init__(self, retriever: ArticleRetriever, model_name: str | None = None, api_key: str | None = None) -> None:
         self.retriever = retriever
 
-        self.model_name = (
-            model_name
-            or os.getenv(
-                "OPENAI_MODEL",
-                "gpt-4o-mini",
-            )
-        )
+        self.model_name = (model_name or os.getenv("OPENAI_MODEL", "gpt-4o-mini"))
 
-        self.api_key = (
-            api_key
-            or os.getenv("LLM_API_KEY")
-        )
+        self.api_key = (api_key or os.getenv("LLM_API_KEY"))
 
         if not self.api_key:
-            raise ValueError(
-                "OPENAI_API_KEY is missing. "
-            )
+            raise ValueError("OPENAI_API_KEY is missing. ")
 
-        self.client = OpenAI(
-            api_key=self.api_key,
-        )
+        self.client = OpenAI(api_key=self.api_key,)
 
     @staticmethod
     def _format_context(results: list[RetrievedArticle],) -> str:
@@ -72,33 +54,16 @@ class ArticleRAGPipeline:
 
         return "\n\n".join(context_parts)
 
-    def generate_abstract(
-        self,
-        requested_title: str,
-        top_k: int = 3,
-        minimum_similarity: float = 0.35,
-    ) -> str:
-        results = self.retriever.retrieve(
-            requested_title=requested_title,
-            top_k=top_k,
-        )
+    def generate_abstract(self, requested_title: str, top_k: int = 3, minimum_similarity: float = 0.35) -> str:
+        results = self.retriever.retrieve(requested_title=requested_title, top_k=top_k)
 
         if not results:
-            return (
-                "No matching article was found in the database."
-            )
+            return "No matching article was found in the database."
 
         best_result = results[0]
 
-        if (
-            best_result.match_type != "exact_title"
-            and best_result.similarity_score
-            < minimum_similarity
-        ):
-            return (
-                "No matching article was found "
-                "in the database."
-            )
+        if best_result.match_type != "exact_title" and best_result.similarity_score < minimum_similarity:
+            return "No matching article was found in the database."
 
         context = self._format_context(results)
 
@@ -166,8 +131,6 @@ No matching article was found in the database.
         answer = response.choices[0].message.content
 
         if not answer:
-            raise RuntimeError(
-                "The Llama model returned an empty response."
-            )
+            raise RuntimeError("The model returned an empty response.")
 
         return answer.strip()
