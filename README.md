@@ -11,6 +11,26 @@ both sources. The sample is drawn with a fixed seed, so the whole dataset rebuil
 identically from one command.
 
 Python 3, standard library only (nothing to `pip install`).
+## Layout
+
+```
+kg_extraction/        data extraction + KG-building pipeline
+  build_kg.py         CLI entry point (run as `python -m kg_extraction.build_kg`)
+  eda.py              exploratory analysis of the raw arXiv snapshot
+  config.py           paths (relative to data/) + pretty-print threshold
+  utils.py            text cleanup + author-key normalization
+  arxiv.py            streaming JSONL reader + reproducible sampling
+  graph.py            in-memory graph model
+  rdf.py              RDF export (Turtle/TriG) for GraphDB
+  papers.py           article-table export (CSV/JSON), the RAG corpus
+data/
+  raw/                arXiv snapshot (not committed, see Data source)
+  processed/          committed knowledge_graph.ttl / knowledge_graph.csv
+webapp/               Flask demo app (currently a stub - RAG pipeline not wired in yet)
+  app.py
+  templates/
+  static/
+```
 
 ## Data source
 
@@ -246,23 +266,4 @@ researchers collapsed into one node. Consequences:
   options (finer keys using full given names or blocking on
   name+affiliation) and their precision/recall trade-offs.
 
-## Layout
 
-```
-kg_extraction/        data extraction + KG-building pipeline
-  build_kg.py         CLI entry point (run as `python -m kg_extraction.build_kg`)
-  eda.py              exploratory analysis of the raw arXiv snapshot
-  config.py           paths (relative to data/) + pretty-print threshold
-  utils.py            text cleanup + author-key normalization
-  arxiv.py            streaming JSONL reader + reproducible sampling
-  graph.py            in-memory graph model
-  rdf.py              RDF export (Turtle/TriG) for GraphDB
-  papers.py           article-table export (CSV/JSON), the RAG corpus
-data/
-  raw/                arXiv snapshot (not committed, see Data source)
-  processed/          committed knowledge_graph.ttl / knowledge_graph.csv
-webapp/               Flask demo app (currently a stub - RAG pipeline not wired in yet)
-  app.py
-  templates/
-  static/
-```
