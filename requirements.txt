@@ -1,5 +1,6 @@
 faiss-cpu
 numpy
-sentence_transformers
-python-dotenv
 openai
+python-dotenv
+rdflib
+sentence_transformers
