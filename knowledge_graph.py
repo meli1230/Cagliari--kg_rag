@@ -1,18 +1,23 @@
-# entry point: sample/filter papers from the arxiv snapshot and write the graph json.
-# usage examples, flags and the package layout are in README.md
+# entry point: sample/filter papers from the arxiv snapshot and write the graph
+# as RDF (Turtle/TriG) for GraphDB. usage, flags and layout are in README.md
 
 import argparse
 import time
 
 from kg.arxiv import iter_papers, sample_papers
-from kg.config import DEFAULT_INPUT, DEFAULT_OUTPUT
-from kg.graph import ingest_paper, load_graph, new_graph, save_graph
+from kg.config import DEFAULT_INPUT, DEFAULT_OUTPUT, DEFAULT_RDF_BASE
+from kg.graph import graph_stats, ingest_paper, new_graph
+from kg.rdf import save_rdf
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Build a knowledge graph from arXiv metadata.")
+    parser = argparse.ArgumentParser(description="Build an RDF knowledge graph from arXiv metadata.")
     parser.add_argument("--input", default=DEFAULT_INPUT)
-    parser.add_argument("--output", default=DEFAULT_OUTPUT)
+    parser.add_argument("--output", default=DEFAULT_OUTPUT, help="RDF output path (.ttl/.trig)")
+    parser.add_argument("--format", choices=["ttl", "trig"], default="ttl",
+                        help="RDF serialization: Turtle (default) or TriG")
+    parser.add_argument("--base", default=DEFAULT_RDF_BASE,
+                        help="namespace base for author/category/vocab IRIs")
     parser.add_argument("--limit", type=int, default=25, help="max papers this run; 0 = no limit")
     parser.add_argument("--sample", type=int, default=None,
                         help="randomly sample N papers from the matches (reproducible with --seed)")
@@ -20,15 +25,9 @@ def main():
     parser.add_argument("--categories", nargs="*", default=None,
                         help="category prefixes, e.g. cs.AI cs.LG hep-ph (or just cs)")
     parser.add_argument("--search", default=None, help="keyword that must appear in title/abstract")
-    parser.add_argument("--resume", action="store_true",
-                        help="load existing output and continue where the last run stopped")
     args = parser.parse_args()
 
-    graph = load_graph(args.output) if args.resume else new_graph()
-    skip_ids = set(graph["papers"])
-    if skip_ids:
-        print(f"Resuming: skipping {len(skip_ids)} already-processed papers")
-
+    graph = new_graph()
     processed = 0
     start = time.time()
     try:
@@ -39,7 +38,7 @@ def main():
                 ingest_paper(graph, paper)
                 processed += 1
         else:
-            for paper in iter_papers(args.input, args.categories, args.search, args.limit, skip_ids):
+            for paper in iter_papers(args.input, args.categories, args.search, args.limit, set()):
                 ingest_paper(graph, paper)
                 processed += 1
                 if processed % 10_000 == 0:
@@ -48,10 +47,12 @@ def main():
     except KeyboardInterrupt:
         print("\nInterrupted — saving what we have...")
 
-    stats = save_graph(graph, args.output)
+    n = save_rdf(graph, args.output, fmt=args.format, base=args.base)
+    stats = graph_stats(graph)
     elapsed = time.time() - start
     print(f"\nDone in {elapsed:.0f}s: {processed} papers this run.")
-    print(f"Graph: {stats['nodes']:,} nodes, {stats['relationships']:,} relationships -> {args.output}")
+    print(f"RDF ({args.format}): {stats['nodes']:,} nodes, "
+          f"{stats['relationships']:,} relationships -> {args.output}")
     print(f"  papers={stats['papers']:,} authors={stats['authors']:,} "
           f"categories={stats['categories']:,}")
 

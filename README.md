@@ -1,6 +1,7 @@
 # arXiv Knowledge Graph
 
-Builds a property graph out of the arXiv metadata snapshot (deterministically).
+Builds a knowledge graph out of the arXiv metadata snapshot (deterministically) and
+emits it as RDF (Turtle/TriG) for GraphDB or any triplestore.
 
 Built to produce a small, reproducible benchmark for RAG question-answering:
 a random sample of papers whose abstracts are the retrieval corpus, paired with a
@@ -19,13 +20,13 @@ The [arXiv metadata snapshot](https://www.kaggle.com/datasets/Cornell-University
 
 ## Graph schema
 
-Nodes
+Nodes (the conceptual model; the RDF IRIs and predicates are in [Output](#output))
 
-| Label | Key | Properties |
+| Type | IRI | Properties |
 |---|---|---|
-| `Paper` | `paper:<arxiv_id>` | `arxiv_id`, `title`, `abstract`, `authors`, `author_keys`, `categories`, `doi`, `journal_ref`, `update_date` |
-| `Author` | `author:<key>` | `name`, `paper_count` |
-| `Category` | `category:<name>` | `name`, `paper_count` |
+| `Paper` | `https://arxiv.org/abs/<arxiv_id>` | `arxiv_id`, `title`, `abstract`, `authors`, `categories`, `doi`, `journal_ref`, `update_date` |
+| `Author` | `<base>/author/<key>` | `name`, `paper_count` |
+| `Category` | `<base>/category/<name>` | `name`, `paper_count` |
 
 Relationships
 
@@ -63,37 +64,56 @@ Flags:
 | `--categories` | Category prefixes, space-separated (e.g. `cs.AI cs.LG`, or just `cs`). A paper matches if any of its categories starts with any prefix. |
 | `--search` | Keyword that must appear in the title or abstract (case-insensitive). |
 | `--limit N` | Stop after N matching papers. `0` = no limit. Note: the snapshot is in ascending arXiv-ID order, so a bounded run returns the oldest N, not the newest. Ignored when `--sample` is set. |
-| `--resume` | Load the existing output and skip papers already in it, then keep going. |
-| `--input` / `--output` | Override the default paths from `kg/config.py`. |
+| `--format` | RDF serialization: `ttl` (Turtle, default) or `trig` (TriG, wraps the data in one named graph). |
+| `--base` | Namespace base for author/category/vocabulary IRIs (default `http://example.org/arxiv/`, from `kg/config.py`). arXiv papers always use their real `https://arxiv.org/abs/` URIs. |
+| `--input` / `--output` | Override the default snapshot / RDF-output paths from `kg/config.py`. |
 
-Papers with no abstract are always skipped. `Ctrl-C` during a run saves what's been
+Papers with no abstract are always skipped. `Ctrl-C` during a run writes what's been
 ingested so far.
 
 ## Output
 
-A [JSON Lines](https://jsonlines.org/) file (`.jsonl`, `DEFAULT_OUTPUT` in the config):
-**one JSON object per line**. The first line is a `stats` summary, then one line per
-node, then one line per relationship:
+An RDF file for a triplestore: **Turtle** (`.ttl`, default) or **TriG** (`.trig`, via
+`--format trig`, which wraps everything in one named graph). `DEFAULT_OUTPUT` in the
+config. The conceptual graph above maps onto standard vocabularies (Dublin Core, FOAF,
+BIBO) so it's queryable without a custom ontology:
 
-```jsonl
-{"stats": {"papers": ..., "authors": ..., "categories": ..., "nodes": ..., "relationships": ..., "generated": "..."}}
-{"id": "paper:2203.02997", "labels": ["Paper"], "properties": { ... }}
-{"id": "author:gokcesu_k", "labels": ["Author"], "properties": { ... }}
-{"id": "category:cs.LG", "labels": ["Category"], "properties": { ... }}
-{"source": "author:gokcesu_k", "target": "paper:2203.02997", "type": "AUTHORED", "properties": {"position": 1}}
-{"source": "paper:2203.02997", "target": "category:cs.LG", "type": "IN_CATEGORY", "properties": {}}
+| Node / edge | RDF |
+|---|---|
+| `Paper` | `<https://arxiv.org/abs/{id}>` `a kg:Paper, bibo:AcademicArticle` |
+| paper `title` / `abstract` / `update_date` | `dcterms:title` / `dcterms:abstract` / `dcterms:date`^^`xsd:date` |
+| paper `doi` / `journal_ref` | `bibo:doi` / `dcterms:bibliographicCitation` (omitted when empty) |
+| `Author` | `<…/author/{key}>` `a kg:Author, foaf:Person`; `foaf:name` |
+| `Category` | `<…/category/{name}>` `a kg:Category`; `rdfs:label` |
+| `AUTHORED` (with `position`) | `dcterms:creator` + ordered `kg:authorList ( … )` (order = position) |
+| `IN_CATEGORY` | `kg:inCategory` |
+| `paper_count` | `kg:paperCount`^^`xsd:integer` |
+
+Papers use their real, dereferenceable arXiv URIs; authors/categories/vocabulary hang off
+`--base`. Every node also carries `rdfs:label` so GraphDB's visual graph shows readable
+names, and the file is self-describing (the `kg:` classes/properties are declared inline).
+Paper nodes carry `dcterms:abstract`, so this one file is both the RAG corpus (the
+abstract text to retrieve over) and the knowledge graph (the structure to reason over) —
+no second file to keep in sync. Old-style arXiv ids with a slash (`hep-ph/9901001`) are
+handled — every resource is emitted as a full IRI.
+
+### Import into GraphDB
+
+*Import → Upload RDF files* (or *Import → RDF from URL*), pick the `.ttl`/`.trig`,
+optionally target a named graph, and import. Then, for example:
+
+```sparql
+PREFIX kg: <http://example.org/arxiv/schema#>
+PREFIX dct: <http://purl.org/dc/terms/>
+PREFIX foaf: <http://xmlns.com/foaf/0.1/>
+# papers in cs.LG and their authors
+SELECT ?title ?author WHERE {
+  ?p a kg:Paper ; dct:title ?title ;
+     kg:inCategory <http://example.org/arxiv/category/cs.LG> ;
+     dct:creator ?a .
+  ?a foaf:name ?author .
+}
 ```
-
-Node lines have a `labels` key; relationship lines have `source`/`target`. JSON Lines is
-streamable (read it line by line, no need to load the whole file) and appendable, and it
-imports directly into Neo4j via `apoc.import.json`.
-
-Paper nodes carry the `abstract`, so this one file is both the RAG corpus (the
-abstract text to retrieve over) and the knowledge graph (the structure to reason
-over) - no second file to keep in sync.
-
-> A full-category run (no `--sample`) can produce a large file, but because it's line
-> delimited you can stream it without loading it all into memory.
 
 ### Current build
 
@@ -214,4 +234,5 @@ kg/
   utils.py           text cleanup + author-key normalization
   arxiv.py           streaming JSONL reader + reproducible sampling
   graph.py           graph model + JSONL save/load
+  rdf.py             RDF export (Turtle/TriG) for GraphDB
 ```
