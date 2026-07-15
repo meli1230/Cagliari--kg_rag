@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+  <html lang="it">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>arXiv Knowledge Graph RAG</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  </head>
+  <body>
+    <div class="chat-container">
+      <div class="chat-header">
+        <svg width="52" height="52" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="8" y="4" width="28" height="36" rx="3" fill="white" fill-opacity="0.15" stroke="white" stroke-opacity="0.4" stroke-width="1.5"/>
+          <line x1="13" y1="13" x2="30" y2="13" stroke="white" stroke-opacity="0.4" stroke-width="1.5" stroke-linecap="round"/>
+          <line x1="13" y1="18" x2="30" y2="18" stroke="white" stroke-opacity="0.4" stroke-width="1.5" stroke-linecap="round"/>
+          <line x1="13" y1="23" x2="22" y2="23" stroke="white" stroke-opacity="0.4" stroke-width="1.5" stroke-linecap="round"/>
+          <circle cx="36" cy="18" r="7" fill="#8e54e9" stroke="white" stroke-width="1.5"/>
+          <circle cx="44" cy="34" r="6" fill="#4776e6" stroke="white" stroke-width="1.5"/>
+          <circle cx="26" cy="38" r="6" fill="#4776e6" stroke="white" stroke-width="1.5"/>
+          <line x1="36" y1="25" x2="44" y2="28" stroke="white" stroke-opacity="0.8" stroke-width="1.5"/>
+          <line x1="36" y1="25" x2="26" y2="32" stroke="white" stroke-opacity="0.8" stroke-width="1.5"/>
+          <line x1="44" y1="28" x2="26" y2="32" stroke="white" stroke-opacity="0.5" stroke-width="1" stroke-dasharray="3 2"/>
+        </svg>
+        <div>
+          <h1>Chat with arXiv Papers</h1>
+        </div>
+      </div>
+
+      <div id="chat-box">
+        <div class="message bot">
+          <div class="avatar">AI</div>
+          <div class="bubble">Hello! Ask me anything about arXiv research papers.</div>
+        </div>
+         </div>
+
+      <form id="chat-form">
+        <input type="text" id="user-input" placeholder="Ask a question about research papers..." autocomplete="off">
+        <button type="submit">&#10148;</button>
+      </form>
+    </div>
+
+  <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
