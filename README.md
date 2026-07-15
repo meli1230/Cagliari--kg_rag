@@ -71,26 +71,29 @@ ingested so far.
 
 ## Output
 
-A single JSON file (`DEFAULT_OUTPUT` in the config):
+A [JSON Lines](https://jsonlines.org/) file (`.jsonl`, `DEFAULT_OUTPUT` in the config):
+**one JSON object per line**. The first line is a `stats` summary, then one line per
+node, then one line per relationship:
 
-```json
-{
-  "stats": { "papers": ..., "authors": ..., "categories": ..., "nodes": ..., "relationships": ..., "generated": "..." },
-  "nodes": [ ... ],
-  "relationships": [ ... ]
-}
+```jsonl
+{"stats": {"papers": ..., "authors": ..., "categories": ..., "nodes": ..., "relationships": ..., "generated": "..."}}
+{"id": "paper:2203.02997", "labels": ["Paper"], "properties": { ... }}
+{"id": "author:gokcesu_k", "labels": ["Author"], "properties": { ... }}
+{"id": "category:cs.LG", "labels": ["Category"], "properties": { ... }}
+{"source": "author:gokcesu_k", "target": "paper:2203.02997", "type": "AUTHORED", "properties": {"position": 1}}
+{"source": "paper:2203.02997", "target": "category:cs.LG", "type": "IN_CATEGORY", "properties": {}}
 ```
 
-Small graphs are pretty-printed; above `PRETTY_PRINT_LIMIT` nodes+relationships
-(50,000) it's written compact to save space. The layout is import-ready for Neo4j
-(`apoc.load.json`), networkx, or any property-graph database.
+Node lines have a `labels` key; relationship lines have `source`/`target`. JSON Lines is
+streamable (read it line by line, no need to load the whole file) and appendable, and it
+imports directly into Neo4j via `apoc.import.json`.
 
 Paper nodes carry the `abstract`, so this one file is both the RAG corpus (the
 abstract text to retrieve over) and the knowledge graph (the structure to reason
 over) - no second file to keep in sync.
 
-> A full-category run (no `--sample`) can produce a ~1 GB file
-> The default 100-paper sample is small and fine to open.
+> A full-category run (no `--sample`) can produce a large file, but because it's line
+> delimited you can stream it without loading it all into memory.
 
 ### Current build
 
@@ -159,7 +162,7 @@ the reproducibility criterion: 100 papers drawn by reservoir sampling with a fix
 (`--sample 100 --seed 42`). Same seed == identical dataset. change the seed for a
 fresh draw. `cs.AI`+`cs.LG` = "AI and ML".
 
-### 6. Connectivity check: is a random sample too disconnected?
+### 6. Connectivity check
 
 Concern: 100 random papers might barely link up, hurting multi-hop KG reasoning. We
 measured the random baseline against three themed samples (`--search` inside `cs.AI`+
@@ -186,7 +189,7 @@ What we observed:
 Decision: keep the unbiased random baseline. It is already category-complete, and
 themed sampling buys little real author connectivity while biasing the corpus.
 
-### 7. Author entity resolution - a known trade-off and an attack surface
+### 7. Author entity resolution
 
 Authors are keyed by a coarse id: accent-stripped surname + first-name initials
 (`author_key`). This deliberately merges `E. L. Berger` and `Edward L. Berger`, but it
@@ -210,5 +213,5 @@ kg/
   config.py          paths + pretty-print threshold
   utils.py           text cleanup + author-key normalization
   arxiv.py           streaming JSONL reader + reproducible sampling
-  graph.py           graph model + JSON save/load
+  graph.py           graph model + JSONL save/load
 ```
