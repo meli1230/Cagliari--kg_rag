@@ -119,7 +119,7 @@ class ArticleRetriever:
 
         normalized_requested_title = self.normalize_title(requested_title)
 
-        query = ("Find the academic article with this title: {requested_title}")
+        query = (f"Find the academic article with this title: {requested_title}")
 
         query_embedding = self._encode_query(query)
         candidate_count = min(max(top_k * 5, 10), len(self.articles))

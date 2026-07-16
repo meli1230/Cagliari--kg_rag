@@ -1,4 +1,5 @@
 faiss-cpu
+flask
 numpy
 openai
 python-dotenv
