@@ -27,11 +27,7 @@ INDEX_DIRECTORY = (
 def load_articles(csv_path: Path) -> list[Article]:
     articles: list[Article] = []
 
-    with csv_path.open(
-        "r",
-        encoding="utf-8",
-        newline="",
-    ) as file:
+    with csv_path.open("r", encoding="utf-8", newline="",) as file:
         reader = csv.DictReader(file)
 
         for row in reader:
@@ -94,20 +90,10 @@ def main() -> None:
         )
 
     print(f"Loaded {len(articles)} articles.")
-
     retriever = ArticleRetriever()
-
-    retriever.build_index(
-        articles
-    )
-
-    retriever.save(
-        INDEX_DIRECTORY
-    )
-
-    print(
-        f"Saved FAISS index to: {INDEX_DIRECTORY}"
-    )
+    retriever.build_index(articles)
+    retriever.save(INDEX_DIRECTORY)
+    print(f"Saved FAISS index to: {INDEX_DIRECTORY}")
 
 
 if __name__ == "__main__":
