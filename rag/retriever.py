@@ -95,7 +95,9 @@ class ArticleRetriever:
         print(f"Indexed {len(self.articles)} articles.")
 
     def _find_exact_matches(self, requested_title: str, ) -> list[RetrievedArticle]:
-        normalized_requested_title = self.normalize_title(requested_title)
+        normalized_requested_title = self.normalize_title(
+            requested_title
+        )
 
         matches = []
 
@@ -129,7 +131,7 @@ class ArticleRetriever:
         if exact_matches:
             return exact_matches[:top_k]
 
-        normalized_requested_title = self.normalize_title()
+        normalized_requested_title = self.normalize_title(requested_title)
 
         query = (
             "Find the academic article with this title: "

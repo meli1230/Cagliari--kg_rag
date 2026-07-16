@@ -323,6 +323,28 @@ Do not add quotation marks or explanations.
 
         return extracted or question
 
+    @staticmethod
+    def _format_answer_with_route(
+            answer: str,
+            kg_used: bool,
+            sparql_query_name: str | None = None,
+            resolved_title: str | None = None,
+    ) -> str:
+        details = [
+            answer,
+            "",
+            "---",
+            f"Knowledge Graph used: {'Yes' if kg_used else 'No'}",
+            f"SPARQL query used: {sparql_query_name or 'None'}",
+        ]
+
+        if resolved_title:
+            details.append(
+                f"Resolved paper title: {resolved_title}"
+            )
+
+        return "\n".join(details)
+
     def answer_question(
             self,
             question: str,
@@ -346,7 +368,9 @@ Do not add quotation marks or explanations.
                 "The question cannot be empty."
             )
 
-        route = self.question_router.route(question)
+        route = self.question_router.route(
+            question
+        )
 
         if route.query_type != KGQueryType.NONE:
             if self.knowledge_graph is None:
@@ -364,13 +388,9 @@ Do not add quotation marks or explanations.
                     sparql_query
                 )
             except RuntimeError:
-                # GraphDB failure should not break the complete
-                # assistant. Fall back to ordinary RAG.
                 kg_titles = []
 
             if kg_titles:
-                # Prevent very large title lists from being sent
-                # to the language model.
                 candidate_titles = kg_titles[
                                    :maximum_kg_titles
                                    ]
@@ -384,19 +404,32 @@ Do not add quotation marks or explanations.
                 )
 
                 if selected_title:
-                    return self.generate_abstract(
+                    answer = self.generate_abstract(
                         requested_title=selected_title,
                         top_k=top_k,
                     )
 
-        # Either no KG query applied, GraphDB failed, or the KG
-        # returned no matching paper.
+                    return self._format_answer_with_route(
+                        answer=answer,
+                        kg_used=True,
+                        sparql_query_name=route.query_type.value,
+                        resolved_title=selected_title,
+                    )
+
         rag_search_title = self._extract_rag_search_title(
             question=question,
             routed_title=route.requested_title,
         )
 
-        return self.generate_abstract(
+        answer = self.generate_abstract(
             requested_title=rag_search_title,
             top_k=top_k,
         )
+
+        return self._format_answer_with_route(
+            answer=answer,
+            kg_used=False,
+            sparql_query_name=None,
+            resolved_title=rag_search_title,
+        )
+
