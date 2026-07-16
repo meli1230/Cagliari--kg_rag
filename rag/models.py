@@ -1,7 +1,25 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal
+
+
+SelectionType = Literal[
+    "single",
+    "latest",
+    "oldest",
+    "most_relevant",
+]
+
+
+@dataclass
+class PaperQueryIntent:
+    title: str | None = None
+    author: str | None = None
+    category: str | None = None
+    year: int | None = None
+    selection: SelectionType = "single"
+    requested_information: str = "abstract"
 
 
 @dataclass

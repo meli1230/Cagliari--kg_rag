@@ -12,7 +12,14 @@ from typing import Any
 
 from rag.models import RetrievedArticle
 from rag.retriever import ArticleRetriever
-from rag.kgqueries import KGQueryEngine
+
+from rag.kg_client import LocalKnowledgeGraph
+
+from rag.kgqueries import (
+    KGQueryType,
+    SPARQL_QUERIES,
+)
+from rag.query_router import QuestionRouter
 
 
 load_dotenv()
@@ -29,21 +36,40 @@ class ArticleRAGPipeline:
     def __init__(
         self,
         retriever: ArticleRetriever,
-        kg_engine: KGQueryEngine | None = None,
+        knowledge_graph: LocalKnowledgeGraph | None = None,
         model_name: str | None = None,
-        base_url: str | None = None,
         api_key: str | None = None,
     ) -> None:
         self.retriever = retriever
-        self.kg_engine = kg_engine
+        self.knowledge_graph = knowledge_graph
 
-        self.model_name = (model_name or os.getenv("OPENAI_MODEL", "gpt-4o-mini"))
-        self.api_key = (api_key or os.getenv("LLM_API_KEY"))
+        self.model_name = (
+            model_name
+            or os.getenv(
+                "OPENAI_MODEL",
+                "gpt-4o-mini",
+            )
+        )
+
+        self.api_key = (
+            api_key
+            or os.getenv("LLM_API_KEY")
+            or os.getenv("OPENAI_API_KEY")
+        )
 
         if not self.api_key:
-            raise ValueError("OPENAI_API_KEY is missing. ")
+            raise ValueError(
+                "LLM_API_KEY or OPENAI_API_KEY is missing."
+            )
 
-        self.client = OpenAI(api_key=self.api_key,)
+        self.client = OpenAI(
+            api_key=self.api_key,
+        )
+
+        self.question_router = QuestionRouter(
+            client=self.client,
+            model_name=self.model_name,
+        )
 
     @staticmethod
     def _format_context(results: list[RetrievedArticle],) -> str:
@@ -153,3 +179,224 @@ No matching article was found in the database.
             raise RuntimeError("The model returned an empty response.")
 
         return answer.strip()
+
+        def _choose_title_from_kg_results(
+                self,
+                question: str,
+                titles: list[str],
+                explicit_title: str | None = None,
+        ) -> str | None:
+            """
+            Choose one title from the titles allowed by the KG result.
+
+            The LLM can only select from the supplied list. It cannot
+            invent a new paper title.
+            """
+            if not titles:
+                return None
+
+            if len(titles) == 1:
+                return titles[0]
+
+            # Prefer an exact title supplied by the user.
+            if explicit_title:
+                normalized_explicit = (
+                    self.retriever.normalize_title(
+                        explicit_title
+                    )
+                )
+
+                for title in titles:
+                    if (
+                            self.retriever.normalize_title(title)
+                            == normalized_explicit
+                    ):
+                        return title
+
+            numbered_titles = "\n".join(
+                f"{index}. {title}"
+                for index, title in enumerate(
+                    titles,
+                    start=1,
+                )
+            )
+
+            system_prompt = """
+    Select the academic-paper title that best satisfies the user's
+    question.
+
+    You may select only one of the supplied candidate titles.
+
+    Do not invent, modify, shorten, or combine titles.
+
+    If the question does not distinguish between the candidates, select
+    the first candidate.
+
+    Return only the selected title, with no explanation.
+    """.strip()
+
+            user_prompt = f"""
+    User question:
+    {question}
+
+    Candidate titles returned by the knowledge graph:
+    {numbered_titles}
+    """.strip()
+
+            response = self.client.chat.completions.create(
+                model=self.model_name,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": system_prompt,
+                    },
+                    {
+                        "role": "user",
+                        "content": user_prompt,
+                    },
+                ],
+                temperature=0.0,
+                max_completion_tokens=150,
+            )
+
+            selected = (
+                    response.choices[0].message.content or ""
+            ).strip()
+
+            normalized_selected = (
+                self.retriever.normalize_title(selected)
+            )
+
+            # Validate that the LLM selected a title that really came
+            # from the Knowledge Graph.
+            for title in titles:
+                if (
+                        self.retriever.normalize_title(title)
+                        == normalized_selected
+                ):
+                    return title
+
+            # Deterministic safe fallback.
+            return titles[0]
+
+        def _extract_rag_search_title(
+                self,
+                question: str,
+                routed_title: str | None,
+        ) -> str:
+            """
+            Produce a title-oriented search query when no KG query applies.
+            """
+            if routed_title:
+                return routed_title
+
+            system_prompt = """
+    Extract the academic-paper title or the shortest title-like search
+    description from the user's question.
+
+    The user is asking for an abstract.
+
+    Return only the paper title or search description.
+    Do not answer the question.
+    Do not add quotation marks or explanations.
+    """.strip()
+
+            response = self.client.chat.completions.create(
+                model=self.model_name,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": system_prompt,
+                    },
+                    {
+                        "role": "user",
+                        "content": question,
+                    },
+                ],
+                temperature=0.0,
+                max_completion_tokens=100,
+            )
+
+            extracted = (
+                    response.choices[0].message.content or ""
+            ).strip()
+
+            return extracted or question
+
+        def answer_question(
+                self,
+                question: str,
+                top_k: int = 3,
+                maximum_kg_titles: int = 100,
+        ) -> str:
+            """
+            Answer an abstract request using KG-guided RAG when possible.
+
+            Flow:
+            1. Classify the question.
+            2. Execute a predefined SPARQL query when applicable.
+            3. Select a title from the KG results.
+            4. Retrieve that title's abstract through RAG.
+            5. Fall back to ordinary RAG when no KG query applies.
+            """
+            question = question.strip()
+
+            if not question:
+                raise ValueError(
+                    "The question cannot be empty."
+                )
+
+            route = self.question_router.route(question)
+
+            if route.query_type != KGQueryType.NONE:
+                if self.knowledge_graph is None:
+                    raise RuntimeError(
+                        "The question requires the Knowledge Graph, "
+                        "but no local TTL graph was configured."
+                    )
+
+                sparql_query = SPARQL_QUERIES[
+                    route.query_type
+                ]
+
+                try:
+                    kg_titles = self.knowledge_graph.get_titles(
+                        sparql_query
+                    )
+                except RuntimeError:
+                    # GraphDB failure should not break the complete
+                    # assistant. Fall back to ordinary RAG.
+                    kg_titles = []
+
+                if kg_titles:
+                    # Prevent very large title lists from being sent
+                    # to the language model.
+                    candidate_titles = kg_titles[
+                                       :maximum_kg_titles
+                                       ]
+
+                    selected_title = (
+                        self._choose_title_from_kg_results(
+                            question=question,
+                            titles=candidate_titles,
+                            explicit_title=route.requested_title,
+                        )
+                    )
+
+                    if selected_title:
+                        return self.generate_abstract(
+                            requested_title=selected_title,
+                            top_k=top_k,
+                        )
+
+            # Either no KG query applied, GraphDB failed, or the KG
+            # returned no matching paper.
+            rag_search_title = self._extract_rag_search_title(
+                question=question,
+                routed_title=route.requested_title,
+            )
+
+            return self.generate_abstract(
+                requested_title=rag_search_title,
+                top_k=top_k,
+            )
