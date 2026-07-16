@@ -445,3 +445,22 @@ stored text verbatim rather than act on it. This is defense-in-depth, not a proo
 robust version of this argument is that the pipeline has no tools and no write path, so a
 successful injection can only corrupt one answer.
 
+## Running
+The `.env` file should have the following structure:
+```dotenv
+LLM_API_KEY=your_api_key_here
+LLM_BASE_URL=https://openrouter.ai/api/v1
+LLM_MODEL=gpt-4o-mini
+```
+
+In order to run the app in the terminal:
+- `python -m rag.build_index` -> for the embeddings
+- `python -m rag.main` -> to run the app
+
+For running the front-end, add to the `.env` file: 
+```dotenv
+FLASK_APP=webapp.app
+```
+
+And to run the app on your browser:
+- `flask run` -> to run the front-end
