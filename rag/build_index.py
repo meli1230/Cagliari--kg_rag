@@ -8,20 +8,8 @@ from rag.retriever import ArticleRetriever
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-
-CSV_PATH = (
-    PROJECT_ROOT
-    / "data"
-    / "processed"
-    / "knowledge_graph.csv"
-)
-
-INDEX_DIRECTORY = (
-    PROJECT_ROOT
-    / "data"
-    / "processed"
-    / "rag_index"
-)
+CSV_PATH = (PROJECT_ROOT/"data/processed/knowledge_graph.csv")
+INDEX_DIRECTORY = (PROJECT_ROOT/ "data/processed/rag_index")
 
 
 def load_articles(csv_path: Path) -> list[Article]:
@@ -31,22 +19,9 @@ def load_articles(csv_path: Path) -> list[Article]:
         reader = csv.DictReader(file)
 
         for row in reader:
-            article_id = (
-                row.get("article_id")
-                or row.get("id")
-                or row.get("arxiv_id")
-                or ""
-            ).strip()
-
-            title = (
-                row.get("title")
-                or ""
-            ).strip()
-
-            abstract = (
-                row.get("abstract")
-                or ""
-            ).strip()
+            article_id = (row.get("article_id") or row.get("id") or row.get("arxiv_id") or "").strip()
+            title = (row.get("title") or "").strip()
+            abstract = (row.get("abstract") or "").strip()
 
             if not title or not abstract:
                 continue
@@ -63,10 +38,7 @@ def load_articles(csv_path: Path) -> list[Article]:
                 key: value
                 for key, value in row.items()
                 if key not in excluded_columns
-                and value not in {
-                    None,
-                    "",
-                }
+                and value not in {None, ""}
             }
 
             articles.append(
@@ -85,9 +57,7 @@ def main() -> None:
     articles = load_articles(CSV_PATH)
 
     if not articles:
-        raise RuntimeError(
-            f"No valid articles were found in {CSV_PATH}"
-        )
+        raise RuntimeError(f"No valid articles were found in {CSV_PATH}")
 
     print(f"Loaded {len(articles)} articles.")
     retriever = ArticleRetriever()
