@@ -107,7 +107,16 @@ class ArticleRetriever:
         if self.index is None:
             raise RuntimeError("The index has not been built or loaded.")
 
-        requested_title = requested_title.strip()
+        requested_title = (
+            requested_title
+            .strip()
+            .strip('"')
+            .strip("'")
+            .replace("...", "")
+        )
+
+        if not requested_title:
+            raise ValueError("The requested title cannot be empty.")
 
         if not requested_title:
             raise ValueError("The requested title cannot be empty.")
@@ -117,9 +126,14 @@ class ArticleRetriever:
         if exact_matches:
             return exact_matches[:top_k]
 
+        partial_matches = self._find_partial_matches(requested_title)
+
+        if partial_matches:
+            return partial_matches[:top_k]
+
         normalized_requested_title = self.normalize_title(requested_title)
 
-        query = ("Find the academic article with this title: {requested_title}")
+        query = f"Find the academic article with this title: {requested_title}"
 
         query_embedding = self._encode_query(query)
         candidate_count = min(max(top_k * 5, 10), len(self.articles))
@@ -137,10 +151,8 @@ class ArticleRetriever:
             match_type = "semantic"
 
             if (
-                    normalized_requested_title
-                    in normalized_candidate_title
-                    or normalized_candidate_title
-                    in normalized_requested_title
+                    normalized_requested_title in normalized_candidate_title
+                    or normalized_candidate_title in normalized_requested_title
             ):
                 final_score += 0.20
                 match_type = "partial_title"
@@ -196,3 +208,22 @@ class ArticleRetriever:
             raw_articles = json.load(file)
 
         self.articles = [Article(**article) for article in raw_articles]
+
+    def _find_partial_matches(self, requested_title: str):
+        normalized = self.normalize_title(requested_title)
+
+        matches = []
+
+        for article in self.articles:
+            article_title = self.normalize_title(article.title)
+
+            if normalized in article_title:
+                matches.append(
+                    RetrievedArticle(
+                        article=article,
+                        similarity_score=0.99,
+                        match_type="partial_title",
+                    )
+                )
+
+        return matches
