@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 from openai import OpenAI
 
-from rag.kg_queries import KGQueryType
+from rag.kgqueries import KGQueryType
 
 
 @dataclass

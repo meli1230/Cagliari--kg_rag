@@ -1,11 +1,8 @@
-from rag.models import Article
-from rag.pipeline import ArticleRAGPipeline
-from rag.retriever import ArticleRetriever
-
 from __future__ import annotations
 
-from pathlib import Path
 
+from rag.retriever import ArticleRetriever
+from pathlib import Path
 from rag.kg_client import LocalKnowledgeGraph
 from rag.pipeline import ArticleRAGPipeline
 
