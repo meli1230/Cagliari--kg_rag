@@ -267,3 +267,8 @@ researchers collapsed into one node. Consequences:
   name+affiliation) and their precision/recall trade-offs.
 
 
+
+
+## Running
+`python -m rag.build_index` -> for the embeddings
+`python -m rag.main` -> to run the app
