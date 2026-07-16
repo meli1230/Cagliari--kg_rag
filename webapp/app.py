@@ -3,10 +3,7 @@ from flask import Flask, render_template, request, jsonify
 app = Flask(__name__)
 
 def rag_answer(question):
-    # QUI colleghiamo la vera pipeline RAG (retrieval + Ollama)
-    # per ora restituisce una risposta finta di test
-    return f"Hai chiesto: '{question}' — qui arriverà la risposta del RAG."
-
+    return f"You asked the following question: '{question}' — here's where the RAG result will come from."
 @app.route("/")
 def home():
     return render_template("index.html")
