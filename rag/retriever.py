@@ -4,7 +4,6 @@ import json
 import re
 import faiss
 import numpy as np
-
 from dataclasses import asdict
 from pathlib import Path
 from sentence_transformers import SentenceTransformer
@@ -75,36 +74,23 @@ class ArticleRetriever:
         ]
 
         if not valid_articles:
-            raise ValueError("No valid articles were provided. Each article must contain a title and an abstract.")
+            raise ValueError("No valid articles were provided.")
 
         self.articles = valid_articles
-
-        texts = [
-            article.text_for_embedding()
-            for article in self.articles
-        ]
-
+        texts = [article.text_for_embedding() for article in self.articles]
         embeddings = self._encode_articles(texts)
         embedding_dimension = embeddings.shape[1]
-
-        self.index = faiss.IndexFlatIP(
-            embedding_dimension
-        )
-
+        self.index = faiss.IndexFlatIP(embedding_dimension)
         self.index.add(embeddings)
         print(f"Indexed {len(self.articles)} articles.")
 
     def _find_exact_matches(self, requested_title: str, ) -> list[RetrievedArticle]:
-        normalized_requested_title = self.normalize_title(
-            requested_title
-        )
+        normalized_requested_title = self.normalize_title(requested_title)
 
         matches = []
 
         for article in self.articles:
-            normalized_article_title = self.normalize_title(
-                article.title
-            )
+            normalized_article_title = self.normalize_title(article.title)
 
             if normalized_article_title == normalized_requested_title:
                 matches.append(
@@ -133,10 +119,7 @@ class ArticleRetriever:
 
         normalized_requested_title = self.normalize_title(requested_title)
 
-        query = (
-            "Find the academic article with this title: "
-            f"{requested_title}"
-        )
+        query = ("Find the academic article with this title: {requested_title}")
 
         query_embedding = self._encode_query(query)
         candidate_count = min(max(top_k * 5, 10), len(self.articles))
@@ -212,7 +195,4 @@ class ArticleRetriever:
         with articles_path.open("r", encoding="utf-8") as file:
             raw_articles = json.load(file)
 
-        self.articles = [
-            Article(**article)
-            for article in raw_articles
-        ]
+        self.articles = [Article(**article) for article in raw_articles]

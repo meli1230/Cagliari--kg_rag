@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass
-
 from openai import OpenAI
 
 from rag.kgqueries import KGQueryType
@@ -17,51 +16,27 @@ class QueryRoute:
 
 
 def _extract_json_object(text: str) -> dict:
-    """
-    Extract a JSON object from an LLM response.
-    """
     text = text.strip()
 
     try:
         return json.loads(text)
     except json.JSONDecodeError:
-        match = re.search(
-            r"\{.*\}",
-            text,
-            flags=re.DOTALL,
-        )
+        match = re.search(r"\{.*\}", text, flags=re.DOTALL)
 
         if not match:
-            raise ValueError(
-                "The routing response did not contain JSON."
-            )
+            raise ValueError("The routing response did not contain JSON.")
 
         return json.loads(match.group(0))
 
 
 class QuestionRouter:
-    def __init__(
-        self,
-        client: OpenAI,
-        model_name: str,
-    ) -> None:
+    def __init__(self, client: OpenAI, model_name: str) -> None:
         self.client = client
         self.model_name = model_name
 
-    def route(
-        self,
-        question: str,
-    ) -> QueryRoute:
-        """
-        Determine whether the question can use a predefined KG query.
-
-        If it cannot, extract the paper title or title-like search
-        description for direct RAG retrieval.
-        """
+    def route(self, question: str) -> QueryRoute:
         system_prompt = """
-You route questions for an academic-paper assistant.
-
-The user always wants the abstract of a paper.
+You route questions for an academic-paper assistant. The user expects the abstract of a paper.
 
 Choose exactly one query type:
 
@@ -98,12 +73,10 @@ Return valid JSON with exactly these fields:
 }
 
 Rules:
-
-1. Only use a KG query when the question explicitly contains the
-   corresponding condition.
-2. Do not assume a condition that the user did not mention.
-3. Preserve an explicitly provided paper title.
-4. Return query_type "none" for normal title-based RAG questions.
+- only use a KG query when the question explicitly contains the corresponding condition;
+- Do not assume a condition that the user did not mention;
+- Preserve an explicitly provided paper title;
+- Return query_type "none" for normal title-based RAG questions.
 """.strip()
 
         user_prompt = f"""
@@ -139,17 +112,11 @@ Route this question:
 
         try:
             data = _extract_json_object(content)
-
-            query_type = KGQueryType(
-                data.get("query_type", "none")
-            )
-
+            query_type = KGQueryType(data.get("query_type", "none"))
             requested_title = data.get("requested_title")
 
             if requested_title is not None:
-                requested_title = str(
-                    requested_title
-                ).strip() or None
+                requested_title = str(requested_title).strip() or None
 
             return QueryRoute(
                 query_type=query_type,
@@ -159,13 +126,7 @@ Route this question:
                 ).strip(),
             )
 
-        except (
-            ValueError,
-            TypeError,
-            json.JSONDecodeError,
-        ):
-            # Safe fallback: do not execute a KG query if routing
-            # cannot be interpreted.
+        except (ValueError, TypeError, json.JSONDecodeError):
             return QueryRoute(
                 query_type=KGQueryType.NONE,
                 requested_title=question,

@@ -157,12 +157,7 @@ If none of the retrieved articles clearly matches, respond exactly: "No matching
 
         system_prompt = """
 Select the academic-paper title that best satisfies the user's question. You may select only one of the supplied candidate titles.
-
-Do not invent, modify, shorten, or combine titles.
-
-If the question does not distinguish between the candidates, select
-the first candidate.
-
+Do not invent, modify, shorten, or combine titles. If the question does not distinguish between the candidates, select the first candidate.
 Return only the selected title, with no explanation.
 """.strip()
 
@@ -190,46 +185,22 @@ Candidate titles returned by the knowledge graph:
             max_completion_tokens=150,
         )
 
-        selected = (
-                response.choices[0].message.content or ""
-        ).strip()
+        selected = (response.choices[0].message.content or "").strip()
+        normalized_selected = (self.retriever.normalize_title(selected))
 
-        normalized_selected = (
-            self.retriever.normalize_title(selected)
-        )
-
-        # Validate that the LLM selected a title that really came
-        # from the Knowledge Graph.
         for title in titles:
-            if (
-                    self.retriever.normalize_title(title)
-                    == normalized_selected
-            ):
+            if (self.retriever.normalize_title(title) == normalized_selected):
                 return title
 
-        # Deterministic safe fallback.
         return titles[0]
 
-    def _extract_rag_search_title(
-            self,
-            question: str,
-            routed_title: str | None,
-    ) -> str:
-        """
-        Produce a title-oriented search query when no KG query applies.
-        """
+    def _extract_rag_search_title(self, question: str, routed_title: str | None) -> str:
         if routed_title:
             return routed_title
 
         system_prompt = """
-Extract the academic-paper title or the shortest title-like search
-description from the user's question.
-
-The user is asking for an abstract.
-
-Return only the paper title or search description.
-Do not answer the question.
-Do not add quotation marks or explanations.
+Extract the academic-paper title from the user's question. The user is asking for an abstract.
+Return only the paper title or search description. Do not answer the question. Do not add quotation marks or explanations.
 """.strip()
 
         response = self.client.chat.completions.create(
@@ -248,10 +219,7 @@ Do not add quotation marks or explanations.
             max_completion_tokens=100,
         )
 
-        extracted = (
-                response.choices[0].message.content or ""
-        ).strip()
-
+        extracted = (response.choices[0].message.content or "").strip()
         return extracted or question
 
     @staticmethod
@@ -270,62 +238,29 @@ Do not add quotation marks or explanations.
         ]
 
         if resolved_title:
-            details.append(
-                f"Resolved paper title: {resolved_title}"
-            )
-
+            details.append(f"Resolved paper title: {resolved_title}")
         return "\n".join(details)
 
-    def answer_question(
-            self,
-            question: str,
-            top_k: int = 3,
-            maximum_kg_titles: int = 100,
-    ) -> str:
-        """
-        Answer an abstract request using KG-guided RAG when possible.
-
-        Flow:
-        1. Classify the question.
-        2. Execute a predefined SPARQL query when applicable.
-        3. Select a title from the KG results.
-        4. Retrieve that title's abstract through RAG.
-        5. Fall back to ordinary RAG when no KG query applies.
-        """
+    def answer_question(self, question: str, top_k: int = 3, maximum_kg_titles: int = 100) -> str:
         question = question.strip()
 
         if not question:
-            raise ValueError(
-                "The question cannot be empty."
-            )
+            raise ValueError("The question cannot be empty.")
 
-        route = self.question_router.route(
-            question
-        )
+        route = self.question_router.route(question)
 
         if route.query_type != KGQueryType.NONE:
             if self.knowledge_graph is None:
-                raise RuntimeError(
-                    "The question requires the Knowledge Graph, "
-                    "but no local TTL graph was configured."
-                )
-
-            sparql_query = SPARQL_QUERIES[
-                route.query_type
-            ]
+                raise RuntimeError("The question requires the knowledge graph, but no local graph was found.")
+            sparql_query = SPARQL_QUERIES[route.query_type]
 
             try:
-                kg_titles = self.knowledge_graph.get_titles(
-                    sparql_query
-                )
+                kg_titles = self.knowledge_graph.get_titles(sparql_query)
             except RuntimeError:
                 kg_titles = []
 
             if kg_titles:
-                candidate_titles = kg_titles[
-                                   :maximum_kg_titles
-                                   ]
-
+                candidate_titles = kg_titles[:maximum_kg_titles]
                 selected_title = (
                     self._choose_title_from_kg_results(
                         question=question,
