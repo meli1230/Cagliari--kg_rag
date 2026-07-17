@@ -38,7 +38,7 @@ rag/                  the query-time pipeline
   query_router.py     LLM router: question -> KG query type (or none)
   kgqueries.py        the canned SPARQL queries + their enum
   kg_client.py        loads the .ttl with rdflib, runs SELECT queries locally
-  retriever.py        embedding + FAISS index, exact/partial/semantic title matching
+  retriever.py        embedding + FAISS index, exact/partial/semantic matching + optional cross-encoder reranker
   models.py           Article / RetrievedArticle dataclasses
   settings.py         env-var helper (currently unused, see Known gaps)
 data/
@@ -301,6 +301,20 @@ Matching is tiered:
 is an exact title match or clears `minimum_similarity=0.35`, so an off-corpus question
 gets "No matching article was found in the database." instead of a hallucination.
 
+**Optional reranker.** `retrieve(..., use_reranker=True)` replaces the heuristic
+`partial_title` boost with a local cross-encoder
+(`cross-encoder/ms-marco-MiniLM-L-6-v2`, bundled with sentence-transformers - no extra
+dependency, no API calls): the FAISS candidates are re-scored on the
+(requested title, article text) pair, sigmoid-squashed into `[0, 1]` so the same
+`minimum_similarity` threshold applies, and returned as `match_type: "reranked"`. The
+exact-title short-circuit is untouched. The model is lazy-loaded on first use
+(downloaded from HuggingFace once, ~80 MB), so the default path pays nothing. Off by
+default everywhere; the web UI exposes it as a "Reranker" toggle next to the input box,
+and the flag threads through `answer_question` / `generate_abstract` as `use_reranker`.
+Cross-encoders score the query and document *jointly*, so a paraphrased title that the
+bi-encoder leaves just under the 0.35 gate (e.g. cosine 0.34) typically comes back well
+above it (~0.81) when it really is the right paper.
+
 ### 4. Answering
 
 The final call hands the model the retrieved articles and asks it to return the stored
@@ -327,9 +341,11 @@ Resolved paper title: ...
 
 - CLI - `python -m rag.main`. Interactive loop; `exit` or `quit` to stop.
 - Web - `python webapp/app.py`, then http://localhost:5000. A chat UI
-  (`GET /`) posting to a JSON endpoint (`POST /ask` → `{"answer": ...}`). The retriever,
-  graph, and pipeline are constructed once at import, so the first request is warm but
-  startup pays the model-load and TTL-parse cost.
+  (`GET /`) posting to a JSON endpoint (`POST /ask` → `{"answer": ...}`; an optional
+  `"use_reranker": true` in the body enables the cross-encoder reranker, surfaced in the
+  UI as a toggle next to the input). The retriever, graph, and pipeline are constructed
+  once at import, so the first request is warm but startup pays the model-load and
+  TTL-parse cost.
 
 ### 5. Adversarial testing
 
