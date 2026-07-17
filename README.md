@@ -1,4 +1,4 @@
-# arXiv RAG + Knowledge Graph
+# arXividerci: arXiv RAG + Knowledge Graph
 
 A KG-augmented RAG assistant over a reproducible slice of arXiv. It answers questions
 like "give me the abstract of paper X" or "what's the most recent paper?" by combining
