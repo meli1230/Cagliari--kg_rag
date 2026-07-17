@@ -1,4 +1,4 @@
-# arXividerci: arXiv RAG + Knowledge Graph
+# arXivederci<br><sub>arXiv RAG + Knowledge Graph</sub>
 
 A KG-augmented RAG assistant over a reproducible slice of arXiv. It answers questions
 like "give me the abstract of paper X" or "what's the most recent paper?" by combining
@@ -79,8 +79,8 @@ prebuilt FAISS index, so you can skip straight to `rag.main` without downloading
 
 ## Data source
 
-The [arXiv metadata snapshot](https://www.kaggle.com/datasets/Cornell-University/arxiv)
-- one JSON object per line, ~3.1M papers, ~5 GB. Not committed (too large); drop it at
+The [arXiv metadata snapshot](https://www.kaggle.com/datasets/Cornell-University/arxiv) —
+one JSON object per line, ~3.1M papers, ~5 GB. Not committed (too large); drop it at
 `data/raw/arxiv-metadata-oai-snapshot.json`, or override the path in
 [`kg_extraction/config.py`](kg_extraction/config.py) (`DEFAULT_INPUT`).
 
@@ -198,7 +198,7 @@ DataFrame), or `--papers-format json` for a JSON array.
 | `arxiv_id`, `url` | `url` is `https://arxiv.org/abs/<arxiv_id>` - the join key: it's exactly the `Paper` IRI in the RDF, so the table and the graph line up 1:1. |
 | `title`, `abstract` | The retrieval text (title + abstract). |
 | `authors` | Human-readable author string. |
-| `author_keys`, `categories` | Multi-valued: JSON arrays, or `|`-joined in CSV. `author_keys`/`categories` are the graph's `Author`/`Category` keys, so you can walk from a retrieved row into the KG. |
+| `author_keys`, `categories` | Multi-valued: JSON arrays, or `\|`-joined in CSV. `author_keys`/`categories` are the graph's `Author`/`Category` keys, so you can walk from a retrieved row into the KG. |
 | `update_date`, `doi`, `journal_ref` | Metadata (may be empty). |
 
 So the two artifacts complement each other: the CSV/JSON is the text to retrieve over,
@@ -528,7 +528,7 @@ with it again. So: corpus = abstracts; KG = authorship + category structure.
 
 The task allowed hand-curation, but we chose an automated, reproducible sample for
 the reproducibility criterion: 100 papers drawn by reservoir sampling with a fixed seed
-(`--sample 100 --seed 42`). Same seed == identical dataset. change the seed for a
+(`--sample 100 --seed 42`). Same seed == identical dataset. Change the seed for a
 fresh draw. `cs.AI`+`cs.LG` = "AI and ML".
 
 ### 6. Connectivity check
