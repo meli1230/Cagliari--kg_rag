@@ -140,6 +140,36 @@ body {
   flex-shrink: 0;
 }
 
+#reranker-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 18px;
+  border: 1.5px solid #e0e0e0;
+  border-radius: 30px;
+  font-size: 0.95rem;
+  color: #555;
+  cursor: pointer;
+  user-select: none;
+  flex-shrink: 0;
+  transition: border-color 0.2s, background 0.2s, color 0.2s;
+}
+
+#reranker-toggle:hover {
+  border-color: #4776e6;
+}
+
+#reranker-toggle:has(input:checked) {
+  background: linear-gradient(135deg, #4776e6, #8e54e9);
+  border-color: transparent;
+  color: white;
+}
+
+#reranker-toggle input {
+  accent-color: #8e54e9;
+  cursor: pointer;
+}
+
 #user-input {
   flex: 1;
   padding: 14px 22px;

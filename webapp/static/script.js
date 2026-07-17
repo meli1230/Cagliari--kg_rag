@@ -1,6 +1,7 @@
 const form = document.getElementById("chat-form");
 const input = document.getElementById("user-input");
 const chatBox = document.getElementById("chat-box");
+const rerankerCheckbox = document.getElementById("use-reranker");
 
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -13,7 +14,7 @@ form.addEventListener("submit", async (e) => {
   const response = await fetch("/ask", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ question: question })
+    body: JSON.stringify({ question: question, use_reranker: rerankerCheckbox.checked })
   });
   const data = await response.json();
   addMessage(data.answer, "bot");

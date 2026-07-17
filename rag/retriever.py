@@ -6,17 +6,29 @@ import faiss
 import numpy as np
 from dataclasses import asdict
 from pathlib import Path
-from sentence_transformers import SentenceTransformer
+from sentence_transformers import CrossEncoder, SentenceTransformer
 
 from rag.models import Article, RetrievedArticle
 
 
 class ArticleRetriever:
-    def __init__(self, embedding_model_name: str = "sentence-transformers/all-MiniLM-L6-v2", ) -> None:
+    def __init__(
+            self,
+            embedding_model_name: str = "sentence-transformers/all-MiniLM-L6-v2",
+            reranker_model_name: str = "cross-encoder/ms-marco-MiniLM-L-6-v2",
+    ) -> None:
         self.embedding_model_name = embedding_model_name
         self.embedding_model = SentenceTransformer(embedding_model_name)
+        self.reranker_model_name = reranker_model_name
+        self._reranker: CrossEncoder | None = None
         self.articles: list[Article] = []
         self.index: faiss.IndexFlatIP | None = None
+
+    def _get_reranker(self) -> CrossEncoder:
+        if self._reranker is None:
+            self._reranker = CrossEncoder(self.reranker_model_name)
+
+        return self._reranker
 
     @staticmethod
     def normalize_title(title: str) -> str:
@@ -103,7 +115,23 @@ class ArticleRetriever:
 
         return matches
 
-    def retrieve(self, requested_title: str, top_k: int = 3, ) -> list[RetrievedArticle]:
+    def _rerank_candidates(self, requested_title: str, candidates: list[Article], ) -> list[RetrievedArticle]:
+        reranker = self._get_reranker()
+        pairs = [(requested_title, article.text_for_embedding()) for article in candidates]
+        raw_scores = np.asarray(reranker.predict(pairs), dtype=np.float32)
+        # Sigmoid keeps scores in [0, 1], comparable with the pipeline's minimum_similarity threshold.
+        scores = 1.0 / (1.0 + np.exp(-raw_scores))
+
+        return [
+            RetrievedArticle(
+                article=article,
+                similarity_score=float(score),
+                match_type="reranked",
+            )
+            for article, score in zip(candidates, scores)
+        ]
+
+    def retrieve(self, requested_title: str, top_k: int = 3, use_reranker: bool = False, ) -> list[RetrievedArticle]:
         if self.index is None:
             raise RuntimeError("The index has not been built or loaded.")
 
@@ -124,6 +152,21 @@ class ArticleRetriever:
         query_embedding = self._encode_query(query)
         candidate_count = min(max(top_k * 5, 10), len(self.articles))
         scores, indices = self.index.search(query_embedding, candidate_count)
+
+        if use_reranker:
+            candidates = [
+                self.articles[int(article_index)]
+                for article_index in indices[0]
+                if article_index >= 0
+            ]
+            results = self._rerank_candidates(requested_title, candidates)
+            results.sort(
+                key=lambda result: result.similarity_score,
+                reverse=True,
+            )
+
+            return results[:top_k]
+
         results: list[RetrievedArticle] = []
 
         for score, article_index in zip(scores[0], indices[0]):

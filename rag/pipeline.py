@@ -68,8 +68,8 @@ class ArticleRAGPipeline:
 
         return "\n\n".join(context_parts)
 
-    def generate_abstract(self, requested_title: str, top_k: int = 3, minimum_similarity: float = 0.35) -> str:
-        results = self.retriever.retrieve(requested_title=requested_title, top_k=top_k)
+    def generate_abstract(self, requested_title: str, top_k: int = 3, minimum_similarity: float = 0.35, use_reranker: bool = False) -> str:
+        results = self.retriever.retrieve(requested_title=requested_title, top_k=top_k, use_reranker=use_reranker)
 
         if not results:
             return "No matching article was found in the database."
@@ -241,7 +241,7 @@ Return only the paper title or search description. Do not answer the question. D
             details.append(f"Resolved paper title: {resolved_title}")
         return "\n".join(details)
 
-    def answer_question(self, question: str, top_k: int = 3, maximum_kg_titles: int = 100) -> str:
+    def answer_question(self, question: str, top_k: int = 3, maximum_kg_titles: int = 100, use_reranker: bool = False) -> str:
         question = question.strip()
 
         if not question:
@@ -273,6 +273,7 @@ Return only the paper title or search description. Do not answer the question. D
                     answer = self.generate_abstract(
                         requested_title=selected_title,
                         top_k=top_k,
+                        use_reranker=use_reranker,
                     )
 
                     return self._format_answer_with_route(
@@ -290,6 +291,7 @@ Return only the paper title or search description. Do not answer the question. D
         answer = self.generate_abstract(
             requested_title=rag_search_title,
             top_k=top_k,
+            use_reranker=use_reranker,
         )
 
         return self._format_answer_with_route(

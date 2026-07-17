@@ -36,6 +36,10 @@
          </div>
 
       <form id="chat-form">
+        <label id="reranker-toggle" title="Rerank retrieved articles with a local cross-encoder">
+          <input type="checkbox" id="use-reranker">
+          <span>Reranker</span>
+        </label>
         <input type="text" id="user-input" placeholder="Ask a question about research papers..." autocomplete="off">
         <button type="submit">&#10148;</button>
       </form>
